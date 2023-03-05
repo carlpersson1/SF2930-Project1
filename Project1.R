@@ -68,32 +68,37 @@ crPlots(model)
 SS_T = sum((bodyfat$DEXfat - mean(bodyfat$DEXfat))^2)
 R2_pred = 1 - press / SS_T
 
-# Examination of residuals - Seemingly ~3 outliers
+# Examination of residuals - Seemingly ~3 outliers 73, 87, 94
 plot(res_stud)
 plot(res_press)
 plot(res_rstud)
+View(res_stud)
 
 # Covratio with cutoff lines - A fair amount of seemingly influential points for precision
-
+# Influential points - bad for precision 73 (0.31), 87 (0.12), 92 (0.56) and 94 (0.40)
 covrat = covratio(model)
 plot(covrat)
 abline(h=1 - 3*p/n)
 abline(h=1 + 3*p/n)
+View(covrat)
 
 # Cooks distance - No major influential points displacing the model parameters
+# The most influential points 71 (0.12), 73 (0.10), 87 (0.24) and 94 (0.17)
 cooksD = cooks.distance(model)
 plot(cooksD)
 cutoff = qf(0.5, p, n-p)
 abline(h=cutoff)
+View(cooksD)
 
 # Leverage points - About 4 points far enough away to be considered leverage points
+# Leverage points include 71 (0.31), 81 (0.26), 112 (0.26) and 113 (0.29)
 H_diag = lm.influence(model)$hat
 plot(H_diag)
 abline(h=2*p/n)
-View(cbind(res, res_press))
+View(H_diag)
 
-# Checking for normality
-qqPlot(res_stud)
-
+# Checking for normality - 73, 87 and 94 seems to violate the normality condition
+qqinfo = qqPlot(res_stud)
+View(qqinfo)
 
 
