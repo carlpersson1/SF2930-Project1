@@ -11,8 +11,6 @@ summary(bodyfat)
 model <- lm(DEXfat ~., data = bodyfat)
 summary(model)
 
-
-
 #Residual analysis
 n = nrow(bodyfat)
 p = ncol(bodyfat)-1
@@ -35,6 +33,7 @@ plot(res_rstud)
 #Normal probability plot
 qqnorm(res_stud)
 qqline(res_stud)
+qqPlot(res_stud)
 #(s_res_stud <- sort(res_stud))
 #c_prob <- ((1:n)-1/2)/n
 #plot(s_res_stud, c_prob)
@@ -63,8 +62,36 @@ crPlots(model)
 
 #Diagnostics and handling of outliers, leverage and influential observations 
 
-#PRESS statistic (hör nog inte riktigt hemma här men kan vara användbar senare)
+#PRESS statistic 
 (press = sum(res_press^2))
+# Prediction variability power
+SS_T = sum((bodyfat$DEXfat - mean(bodyfat$DEXfat))^2)
+R2_pred = 1 - press / SS_T
+
+# Examination of residuals - Seemingly ~3 outliers
+plot(res_stud)
+plot(res_press)
+plot(res_rstud)
+
+# Covratio with cutoff lines - A fair amount of seemingly influential points for precision
+
+covrat = covratio(model)
+plot(covrat)
+abline(h=1 - 3*p/n)
+abline(h=1 + 3*p/n)
+
+# Cooks distance - No major influential points displacing the model parameters
+cooksD = cooks.distance(model)
+plot(cooksD)
+cutoff = qf(0.5, p, n-p)
+abline(h=cutoff)
+
+# Leverage points - About 4 points far enough away to be considered leverage points
+H_diag = lm.influence(model)$hat
+plot(H_diag)
+abline(h=2*p/n)
+View(cbind(res, res_press))
+
 
 
 
