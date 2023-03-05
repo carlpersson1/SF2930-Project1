@@ -33,7 +33,7 @@ plot(res_rstud)
 #Normal probability plot
 qqnorm(res_stud)
 qqline(res_stud)
-qqPlot(res_stud)
+
 #(s_res_stud <- sort(res_stud))
 #c_prob <- ((1:n)-1/2)/n
 #plot(s_res_stud, c_prob)
@@ -92,6 +92,8 @@ plot(H_diag)
 abline(h=2*p/n)
 View(cbind(res, res_press))
 
+# Checking for normality
+qqPlot(res_stud)
 
 
 
