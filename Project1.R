@@ -49,15 +49,15 @@ fit <- fitted(model)
 plot(fit, res$res_stud)
 
 #Plot of Residuals against the Regressor
-plot(bodyfat$age, res_stud)
-plot(bodyfat$waistcirc, res_stud)
-plot(bodyfat$hipcirc, res_stud)
-plot(bodyfat$elbowbreadth, res_stud)
-plot(bodyfat$kneebreadth, res_stud)
-plot(bodyfat$anthro3a, res_stud)
-plot(bodyfat$anthro3b, res_stud)
-plot(bodyfat$anthro3c, res_stud)
-plot(bodyfat$anthro4, res_stud)
+plot(bodyfat$age, res$res_stud)
+plot(bodyfat$waistcirc, res$res_stud)
+plot(bodyfat$hipcirc, res$res_stud)
+plot(bodyfat$elbowbreadth, res$res_stud)
+plot(bodyfat$kneebreadth, res$res_stud)
+plot(bodyfat$anthro3a, res$res_stud)
+plot(bodyfat$anthro3b, res$res_stud)
+plot(bodyfat$anthro3c, res$res_stud)
+plot(bodyfat$anthro4, res$res_stud)
 
 #Partial regression plots
 avPlots(model)
@@ -68,9 +68,20 @@ crPlots(model)
 #PRESS statistic
 (press = sum(res$res_press^2))
 
+#Transformation of regressors
+#bodyfat$waistcirc = 1 / bodyfat$waistcirc
+#bodyfat$hipcirc = 1 / bodyfat$hipcirc
+bodyfat$anthro3a = 1 / bodyfat$anthro3a
+bodyfat$anthro3b = 1 / bodyfat$anthro3b
+bodyfat$anthro3c = 1 / bodyfat$anthro3c
+bodyfat$anthro4 = 1 / bodyfat$anthro4
+
+
 #Variance-stabilization of the model
 bodyfat$DEXfat <- sqrt(bodyfat$DEXfat)
 model2 <- lm(DEXfat ~., data = bodyfat)
+
+plot(bodyfat)
 
 #Plot of Residuals against the Fitted Values
 res2 <- get_res(model2)
@@ -81,8 +92,21 @@ plot(fit2, res2$res_stud)
 qqnorm(res2$res_stud)
 qqline(res2$res_stud)
 
+#Plot of Residuals against the Regressor
+plot(bodyfat$age, res2$res_stud)
+plot(bodyfat$waistcirc, res2$res_stud)
+plot(bodyfat$hipcirc, res2$res_stud)
+plot(bodyfat$elbowbreadth, res2$res_stud)
+plot(bodyfat$kneebreadth, res2$res_stud)
+plot(bodyfat$anthro3a, res2$res_stud)
+plot(bodyfat$anthro3b, res2$res_stud)
+plot(bodyfat$anthro3c, res2$res_stud)
+plot(bodyfat$anthro4, res2$res_stud)
+
 #Partial regression plots
 avPlots(model2)
+
+
 # Prediction variability power
 (press = sum(res2$res_press^2))
 SS_T = sum((bodyfat$DEXfat - mean(bodyfat$DEXfat))^2)
