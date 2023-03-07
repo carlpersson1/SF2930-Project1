@@ -6,12 +6,11 @@ data("bodyfat")
 plot(bodyfat)
 rownames(bodyfat) <- 1:nrow(bodyfat)
 
-#Create the full model
-model <- lm(DEXfat ~., data = bodyfat)
-(mse<-mean((summary(model)$residuals)^2))
-summary(model)
+create_model <- function(dataset){
+  model <- lm(DEXfat ~., data = dataset)
+  return(model)
+}
 
-#Residual analysis
 get_res <- function(model) {
   n = nrow(bodyfat)
   p = ncol(bodyfat)-1
@@ -29,150 +28,146 @@ get_res <- function(model) {
               "res_rstud"=res_rstud,
               "res_press"=res_press))}
 
-res <- get_res(model)
-
-plot(res$res)
-plot(res$res_stud)
-plot(res$res_press)
-plot(res$res_rstud)
-
-#Normal probability plot
-qqnorm(res$res_stud)
-qqline(res$res_stud)
-
-#(s_res_stud <- sort(res_stud))
-#c_prob <- ((1:n)-1/2)/n
-#plot(s_res_stud, c_prob)
-
-#Plot of Residuals against the Fitted Values
-fit <- fitted(model)
-plot(fit, res$res_stud)
-
-#Plot of Residuals against the Regressor
-plot(bodyfat$age, res$res_stud)
-plot(bodyfat$waistcirc, res$res_stud)
-plot(bodyfat$hipcirc, res$res_stud)
-plot(bodyfat$elbowbreadth, res$res_stud)
-plot(bodyfat$kneebreadth, res$res_stud)
-plot(bodyfat$anthro3a, res$res_stud)
-plot(bodyfat$anthro3b, res$res_stud)
-plot(bodyfat$anthro3c, res$res_stud)
-plot(bodyfat$anthro4, res$res_stud)
-
-#Partial regression plots
-avPlots(model)
-
-#Partial residual plots
-crPlots(model)
-
-#PRESS statistic
-(press = sum(res$res_press^2))
-
-#Variance-stabilization of the model
-#bodyfat$DEXfat <- sqrt(bodyfat$DEXfat)
-bc <- boxcox(DEXfat ~., data=bodyfat)
-(lambda <- bc$x[which.max(bc$y)])
-bodyfat$DEXfat = bodyfat$DEXfat^lambda
-
-DEXfat <- bodyfat$DEXfat
-dt <- bodyfat[,1,drop=FALSE]
-dt <- cbind(dt, DEXfat)
-
-#Transformation of regressors
-(bt <- boxTidwell(DEXfat ~., data=dt)) #Vary to get lambda for all regressors. 
-
-
-bodyfat$age = bodyfat$age^-1.5706
-bodyfat$waistcirc = bodyfat$waistcirc^-0.84096
-bodyfat$hipcirc = bodyfat$hipcirc^-2.8059
-bodyfat$elbowbreadth = bodyfat$elbowbreadth^2.0602
-bodyfat$kneebreadth = bodyfat$kneebreadth^1.3147
-bodyfat$anthro3a = bodyfat$anthro3a^2.5599
-bodyfat$anthro3b = bodyfat$anthro3b^3.3462
-bodyfat$anthro3c = bodyfat$anthro3c^1.9409
-bodyfat$anthro4 = bodyfat$anthro4^3.122
-
-
-model2 <- lm(DEXfat ~., data = bodyfat)
-summary(model2)
-plot(bodyfat)
-
-#Plot of Residuals against the Fitted Values
-res2 <- get_res(model2)
-fit2 <- fitted(model2)
-plot(fit2, res2$res_stud)
-
-#Normal probability plot
-qqnorm(res2$res_stud)
-qqline(res2$res_stud)
-
-#Plot of Residuals against the Regressor
-plot(bodyfat$age, res2$res_stud)
-plot(bodyfat$waistcirc, res2$res_stud)
-plot(bodyfat$hipcirc, res2$res_stud)
-plot(bodyfat$elbowbreadth, res2$res_stud)
-plot(bodyfat$kneebreadth, res2$res_stud)
-plot(bodyfat$anthro3a, res2$res_stud)
-plot(bodyfat$anthro3b, res2$res_stud)
-plot(bodyfat$anthro3c, res2$res_stud)
-plot(bodyfat$anthro4, res2$res_stud)
-
-#Partial regression plots
-avPlots(model2)
-
-(press = sum(res2$res_press^2))
-
-
-#Variable selection
-(k <- 5)
-MSE <- numeric(511)
-ADJR2 <- numeric(511)
-R2 <- numeric(511)
-n <- round(nrow(bodyfat)/k, digits = 0)
-for (i in 1:k){
-  bodyfat[sample(1:nrow(bodyfat)),] #Shuffle the data
-  train_ind <- sample(seq_len(nrow(bodyfat)), size = k)
-  from <- n*(i-1)
-  to <- min(n*i, nrow(bodyfat))
-  test_set <- bodyfat[from:to,]
-  train_set <- bodyfat[-(from:to),]
-  y_train <- train_set$DEXfat
-  y_test <- test_set$DEXfat
-  subs <- regsubsets(DEXfat ~., data=train_set, method = "exhaustive", nbest = 126, nvmax=9, really.big = TRUE)
-  (test_set <- test_set[,-2])
-  (train_set <- train_set[,-2])
-  for (idx in 1:511){
-    (model <- summary(subs)$which[idx,])
-    (model <- model[-1])
-    (train_set_model <- train_set[,model,drop=FALSE])
-    (test_set_model <- test_set[,model,drop=FALSE])
-    (train_set_model <- cbind(train_set_model, y_train))
-    lm_model = lm(y_train ~., data=train_set_model)
-
-    (pred <- predict(lm_model,newdata = test_set_model))
-    
-    (SS_res <- sum((y_test-pred)^2))
-    (SS_R <- sum((pred-mean(y_test))^2))
-    (SS_T <- SS_R + SS_res)
-    (MSE[idx] <- MSE[idx] + mean((y_test-pred)^2))
-    (summary(lm_model))
-    (R2[idx]<- R2[idx] + 1-SS_res/SS_T)
-    (ADJR2[idx] <- ADJR2[idx] + 1-(SS_res/(nrow(train_set)-ncol(test_set)))/(SS_T/(nrow((train_set)-1))))
-  }
+plot_normal <- function(model){
+  res = get_res(model)
+  qqnorm(res$res_stud)
+  qqline(res$res_stud)
 }
-(MSE <- MSE/k)
-(ADJR2 <- ADJR2/k)
-(R2 <- R2/k)
-subs <- regsubsets(DEXfat ~., data=bodyfat, method = "exhaustive", nbest = 126, nvmax=9, really.big = TRUE)
-#(best_model_idx <- which.min(MSE))
-(best_model_idx <- which.max(ADJR2))
-(best_model_cols <- summary(subs)$which[best_model_idx,])
-(best_model_cols <- best_model_cols[-1])
-(DEXfat <- bodyfat$DEXfat)
-(dataset <- bodyfat[,best_model_cols,drop=FALSE])
-(dataset <- cbind(dataset,DEXfat))
-best_model <- lm(DEXfat ~., data=dataset)
-summary(best_model)
+
+plot_res_vs_fitted <- function(model){
+  fit <- fitted(model)
+  res = get_res(model) 
+  plot(fit, res$res_stud)
+}
+
+transform_boxcox <- function(dataset){
+  bf = dataset
+  bc <- boxcox(DEXfat ~., data=bf)
+  (lambda <- bc$x[which.max(bc$y)])
+  bf$DEXfat = bf$DEXfat^lambda
+  return(bf)
+}
+
+transform_boxTidwell <- function(dataset){
+  bf = dataset
+  DEXfat <- bf$DEXfat
+  dt <- bf[,1,drop=FALSE]
+  dt <- cbind(dt, DEXfat)
+  
+  #Transformation of regressors
+  (bt <- boxTidwell(DEXfat ~., data=dt)) #Vary to get lambda for all regressors. 
+  
+  bf$age = bf$age^-1.6591
+  bf$waistcirc = bf$waistcirc^0.60716
+  bf$hipcirc = bf$hipcirc^-0.77347
+  bf$elbowbreadth = bf$elbowbreadth^1.8084
+  bf$kneebreadth = bf$kneebreadth^2.908
+  bf$anthro3a = bf$anthro3a^4.7541
+  bf$anthro3b = bf$anthro3b^5.6786
+  bf$anthro3c = bf$anthro3c^3.3807
+  bf$anthro4 = bf$anthro4^5.2287
+  return(bf)
+}
+
+cross_validate <- function(dataset, k=10){
+  bf = dataset
+  MSE <- numeric(511)
+  ADJR2 <- numeric(511)
+  R2 <- numeric(511)
+  n <- round(nrow(bf)/k, digits = 0)
+  for (i in 1:k){
+    bf <- bf[sample(1:nrow(bf)),] #Shuffle the data
+    train_ind <- sample(seq_len(nrow(bf)), size = k)
+    from <- n*(i-1)
+    to <- min(n*i, nrow(bf))
+    test_set <- bf[from:to,]
+    train_set <- bf[-(from:to),]
+    y_train <- train_set$DEXfat
+    y_test <- test_set$DEXfat
+    subs <- regsubsets(DEXfat ~., data=train_set, method = "exhaustive", nbest = 126, nvmax=9, really.big = TRUE)
+    (test_set <- test_set[,-2])
+    (train_set <- train_set[,-2])
+    for (idx in 1:511){
+      (model <- summary(subs)$which[idx,])
+      (model <- model[-1])
+      (train_set_model <- train_set[,model,drop=FALSE])
+      (test_set_model <- test_set[,model,drop=FALSE])
+      (train_set_model <- cbind(train_set_model, y_train))
+      lm_model = lm(y_train ~., data=train_set_model)
+      
+      (pred <- predict(lm_model,newdata = test_set_model))
+      
+      (SS_res <- sum((y_test-pred)^2))
+      (SS_R <- sum((pred-mean(y_test))^2))
+      (SS_T <- SS_R + SS_res)
+      (MSE[idx] <- MSE[idx] + mean((y_test-pred)^2))
+      (summary(lm_model))
+      (R2[idx]<- R2[idx] + 1-SS_res/SS_T)
+      (ADJR2[idx] <- ADJR2[idx] + 1-(SS_res/(nrow(train_set)-ncol(test_set)))/(SS_T/(nrow((train_set)-1))))
+    }
+  }
+  (MSE <- MSE/k)
+  (ADJR2 <- ADJR2/k)
+  (R2 <- R2/k)
+  
+  subs <- regsubsets(DEXfat ~., data=bf, method = "exhaustive", nbest = 126, nvmax=9, really.big = TRUE)
+  (best_model_idx_adjr2 <- which.max(ADJR2))
+  (best_model_idx_mse <- which.min(MSE))
+  
+  (best_model_cols_adjr2 <- summary(subs)$which[best_model_idx_adjr2,])
+  (best_model_cols_mse <- summary(subs)$which[best_model_idx_mse,])
+  
+  (best_model_cols_adjr2 <- best_model_cols_adjr2[-1])
+  (best_model_cols_mse <- best_model_cols_mse[-1])
+  
+  (DEXfat <- bf$DEXfat)
+  bf <- bf[-2]
+  
+  (dataset_adjr2 <- bf[,best_model_cols_adjr2,drop=FALSE])
+  (dataset_mse <- bf[,best_model_cols_mse,drop=FALSE])
+  
+  (dataset_adjr2 <- cbind(dataset_adjr2,DEXfat))
+  (dataset_mse <- cbind(dataset_mse,DEXfat))
+  
+  model_adjr2 <- create_model(dataset_adjr2)
+  model_mse <- create_model(dataset_mse)
+  
+  return(list("adjr2" = model_adjr2, "mse" = model_mse))
+}
+
+#Initial model
+full_model <- create_model(bodyfat)
+(mse_full_model<-mean((summary(full_model)$residuals)^2))
+summary(full_model)
+plot_normal(full_model) #Normal probability plot
+plot_res_vs_fitted(full_model) #Plot of Residuals against the Fitted Values
+avPlots(full_model) #Partial regression plots
+
+#Box Cox
+data_boxcox <- transform_boxcox(bodyfat)
+boxcox_model <- create_model(data_boxcox)
+summary(boxcox_model)
+plot_normal(boxcox_model) #Normal probability plot
+plot_res_vs_fitted(boxcox_model) #Plot of Residuals against the Fitted Values
+avPlots(boxcox_model) #Partial regression plots
+
+#Box Tidwell
+data_boxtidwell <- transform_boxTidwell(bodyfat)
+boxtidwell_model <- create_model(data_boxtidwell)
+summary(boxtidwell_model)
+plot_normal(boxtidwell_model) #Normal probability plot
+plot_res_vs_fitted(boxtidwell_model) #Plot of Residuals against the Fitted Values
+avPlots(boxtidwell_model) #Partial regression plots
+
+#Cross validation
+boxcox_models <- cross_validate(data_boxcox)
+summary(boxcox_models$adjr2)
+summary(boxcox_models$mse)
+
+
+boxtidwell_models <- cross_validate(data_boxtidwell)
+summary(boxtidwell_models$adjr2)
+summary(boxtidwell_models$mse)
 
 
 ##We should move this \/
