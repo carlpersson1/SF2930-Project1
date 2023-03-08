@@ -2,8 +2,6 @@
 library("TH.data")
 library("car")
 library("leaps")
-library("olsrr")
-
 data("bodyfat")
 plot(bodyfat)
 rownames(bodyfat) <- 1:nrow(bodyfat)
@@ -34,7 +32,6 @@ plot_normal <- function(model){
   res = get_res(model)
   qqnorm(res$res_stud)
   qqline(res$res_stud)
-  qqPlot(res$res_stud)
 }
 
 plot_res_vs_fitted <- function(model){
@@ -48,6 +45,12 @@ transform_boxcox <- function(dataset){
   bc <- boxcox(DEXfat ~., data=bf)
   (lambda <- bc$x[which.max(bc$y)])
   bf$DEXfat = bf$DEXfat^lambda
+  return(bf)
+}
+
+inverse_boxcox <- function(fat){
+  bf = fat
+  bf = bf^(4.5)
   return(bf)
 }
 
@@ -123,8 +126,8 @@ cross_validate <- function(dataset, k=10){
   (best_model_cols_adjr2 <- best_model_cols_adjr2[-1])
   (best_model_cols_mse <- best_model_cols_mse[-1])
   
-  (DEXfat <- bf$DEXfat)
-  bf <- bf[-2]
+  (DEXfat <- dataset$DEXfat)
+  bf <- dataset[-2]
   
   (dataset_adjr2 <- bf[,best_model_cols_adjr2,drop=FALSE])
   (dataset_mse <- bf[,best_model_cols_mse,drop=FALSE])
@@ -145,7 +148,6 @@ summary(full_model)
 plot_normal(full_model) #Normal probability plot
 plot_res_vs_fitted(full_model) #Plot of Residuals against the Fitted Values
 avPlots(full_model) #Partial regression plots
-
 
 # Outliers
 # Examination of residuals - Seemingly ~3 outliers 73, 87, 94
@@ -204,11 +206,11 @@ new_model = lm(DEXfat ~., data=as.data.frame(truncated_data))
 print(ols_coll_diag(new_model))
 summary(new_model)
 
-
 #Box Cox
 data_boxcox <- transform_boxcox(bodyfat)
 boxcox_model <- create_model(data_boxcox)
 summary(boxcox_model)
+(mean((inverse_boxcox(predict(boxcox_model))-bodyfat$DEXfat)^2)) #MSE for boxcox
 plot_normal(boxcox_model) #Normal probability plot
 plot_res_vs_fitted(boxcox_model) #Plot of Residuals against the Fitted Values
 avPlots(boxcox_model) #Partial regression plots
@@ -217,6 +219,7 @@ avPlots(boxcox_model) #Partial regression plots
 data_boxtidwell <- transform_boxTidwell(bodyfat)
 boxtidwell_model <- create_model(data_boxtidwell)
 summary(boxtidwell_model)
+(mean((boxtidwell_model$fitted.values-bodyfat$DEXfat)^2)) #MSE for boxtidwell
 plot_normal(boxtidwell_model) #Normal probability plot
 plot_res_vs_fitted(boxtidwell_model) #Plot of Residuals against the Fitted Values
 avPlots(boxtidwell_model) #Partial regression plots
@@ -226,13 +229,19 @@ boxcox_models <- cross_validate(data_boxcox)
 summary(boxcox_models$adjr2)
 summary(boxcox_models$mse)
 
+(mean((inverse_boxcox(predict(boxcox_models$adjr2))-bodyfat$DEXfat)^2)) #MSE for boxcox adjr2
+(mean((inverse_boxcox(predict(boxcox_models$mse))-bodyfat$DEXfat)^2)) #MSE for boxcox mse
+(sum(((inverse_boxcox(predict(boxcox_models$adjr2))-bodyfat$DEXfat)/(1-lm.influence(boxcox_models$adjr2)$hat))^2)) #PRESS statistic for boxcox adjr2
+(sum(((inverse_boxcox(predict(boxcox_models$mse))-bodyfat$DEXfat)/(1-lm.influence(boxcox_models$mse)$hat))^2)) #PRESS statistic for mse adjr2
 
 boxtidwell_models <- cross_validate(data_boxtidwell)
 summary(boxtidwell_models$adjr2)
 summary(boxtidwell_models$mse)
 
-
-##We should move this \/
+(mean((boxtidwell_models$adjr2$fitted.values-bodyfat$DEXfat)^2)) #MSE for boxtidwell adjr2
+(mean(predict(boxtidwell_models$mse)-bodyfat$DEXfat)^2) #MSE for boxtidwell mse
+(sum((get_res(boxtidwell_models$adjr2)$res_press)^2)) #PRESS statistic for boxtidwell adjr2
+(sum((get_res(boxtidwell_models$mse)$res_press)^2)) #PRESS statistic for boxtidwell mse
 
 # Prediction variability power
 residuals = get_res(full_model)
