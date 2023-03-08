@@ -2,6 +2,8 @@
 library("TH.data")
 library("car")
 library("leaps")
+library("olsrr")
+
 data("bodyfat")
 plot(bodyfat)
 rownames(bodyfat) <- 1:nrow(bodyfat)
@@ -173,19 +175,19 @@ summary(boxtidwell_models$mse)
 ##We should move this \/
 
 # Prediction variability power
-(press = sum(res2$res_press^2))
+residuals = get_res(full_model)
+
+(press = sum(residuals$res_press^2))
 SS_T = sum((bodyfat$DEXfat - mean(bodyfat$DEXfat))^2)
 R2_pred = 1 - press / SS_T
+print(R2_pred)
 
 # Examination of residuals - Seemingly ~3 outliers 73, 87, 94
-plot(res2$res_stud)
-plot(res2$res_press)
-plot(res2$res_rstud)
-View(res2$res_stud)
+plot_res_vs_fitted(full_model)
 
 # Covratio with cutoff lines - A fair amount of seemingly influential points for precision
 # Influential points - bad for precision 73 (0.31), 87 (0.12), 92 (0.56) and 94 (0.40)
-covrat = covratio(model2)
+covrat = covratio(full_model)
 plot(covrat)
 abline(h=1 - 3*p/n)
 abline(h=1 + 3*p/n)
@@ -193,7 +195,7 @@ View(covrat)
 
 # Cooks distance - No major influential points displacing the model parameters
 # The most influential points 71 (0.12), 73 (0.10), 87 (0.24) and 94 (0.17)
-cooksD = cooks.distance(model2)
+cooksD = cooks.distance(full_model)
 plot(cooksD)
 cutoff = qf(0.5, p, n-p)
 abline(h=cutoff)
@@ -201,13 +203,98 @@ View(cooksD)
 
 # Leverage points - About 4 points far enough away to be considered leverage points
 # Leverage points include 71 (0.31), 81 (0.26), 112 (0.26) and 113 (0.29)
-H_diag = lm.influence(model2)$hat
+H_diag = lm.influence(full_model)$hat
 plot(H_diag)
 abline(h=2*p/n)
 View(H_diag)
 
 # Checking for normality - 73, 87 and 94 seems to violate the normality condition
-qqinfo = qqPlot(res2$res_stud)
+qqinfo = qqPlot(residuals$res_stud)
 View(qqinfo)
+
+# Multicollinearity diagnostics
+print(ols_coll_diag(full_model))
+# 4 VIF larger than 5 -> multicollinearity
+# 2 condition indexes larger than 100 - Moderate collinearity
+
+
+# Combining 4 last variables solves the collinearity issue - Transformations?
+n = nrow(bodyfat)
+p = ncol(bodyfat)
+
+new_data = bodyfat[,-(7:p)]
+print(new_data)
+new_data[,7] = bodyfat[,7] + bodyfat[,8]+ bodyfat[,9] +bodyfat[,10]
+
+summary(new_data)
+
+new_model = lm(DEXfat ~., data=new_data)
+
+print(ols_coll_diag(new_model))
+
+# Attempting to apply PCA - Weird results
+pca = prcomp(bodyfat[, -2])
+plot(cumsum(pca$sdev^2/sum(pca$sdev^2)))
+
+n_pc = 3
+truncated_data = pca$x[,1:n_pc]
+print(t(pca$rotation[,1:n_pc]))
+# Multicollinearity diagnostics
+new_model = lm(DEXfat ~., data=as.data.frame(truncated_data))
+print(ols_coll_diag(new_model))
+summary(new_model)
+
+
+
+# Bootstrapping residuals
+
+bootstrap_res <- function(dataset, iter){
+  init_data = dataset
+  n = nrow(dataset)
+  p = ncol(dataset)
+  model = lm(DEXfat ~., data=init_data)
+  coef = matrix(nrow = iter, ncol=p)
+  for (i in 1:iter){
+    temp_mod = lm(DEXfat ~., data=init_data)
+    coef[i,] = as.vector(temp_mod$coefficients)
+    res = get_res(model)
+    e = res$res
+    e = e[sample(1:71, 71, replace=TRUE)]
+    init_data[,2] = model$fitted.values + e 
+  }
+  return(coef)
+}
+
+iter = 2000
+# Get the coefficients for each iteration
+coef = bootstrap_res(bodyfat, iter)
+
+# Calculcate the variance, std and mean for each regression coefficient
+mean = colMeans(coef)
+variance = c()
+sorted = matrix(nrow = iter, ncol=p)
+p = ncol(bodyfat)
+for (i in 1:p){
+  variance = append(variance, var(coef[,i]))
+  sorted[,i] = coef[order(coef[,i], decreasing = FALSE),i]
+}
+print(variance)
+std = sqrt(variance)
+# Calculate 95% boostrap confidence interval
+D = matrix(nrow = 2, ncol=p)
+for (i in 1:p){
+  D[1,i] = coef[1,i] - sorted[iter * 0.025,i]
+  D[2,i] = sorted[iter * 0.975,i] - coef[1,i]
+}
+conf_int = matrix(nrow = 2, ncol=p)
+for (i in 1:p){
+  conf_int[1,i] = coef[1,i] + D[1,i]
+  conf_int[2,i] = coef[1,i] - D[2,i]
+}
+
+# Display mean, standard deviation and 0.25% confidence intervals
+print(mean)
+print(std)
+print(conf_int)
 
 
