@@ -148,6 +148,7 @@ summary(full_model)
 plot_normal(full_model) #Normal probability plot
 plot_res_vs_fitted(full_model) #Plot of Residuals against the Fitted Values
 avPlots(full_model) #Partial regression plots
+(press = sum(get_res(full_model)$res_press^2)) #PRESS statistic of initial model
 
 # Outliers
 # Examination of residuals - Seemingly ~3 outliers 73, 87, 94
