@@ -34,6 +34,7 @@ plot_normal <- function(model){
   res = get_res(model)
   qqnorm(res$res_stud)
   qqline(res$res_stud)
+  qqPlot(res$res_stud)
 }
 
 plot_res_vs_fitted <- function(model){
@@ -145,6 +146,65 @@ plot_normal(full_model) #Normal probability plot
 plot_res_vs_fitted(full_model) #Plot of Residuals against the Fitted Values
 avPlots(full_model) #Partial regression plots
 
+
+# Outliers
+# Examination of residuals - Seemingly ~3 outliers 73, 87, 94
+plot_res_vs_fitted(full_model)
+
+# Covratio with cutoff lines - A fair amount of seemingly influential points for precision
+# Influential points - bad for precision 73 (0.31), 87 (0.12), 92 (0.56) and 94 (0.40)
+covrat = covratio(full_model)
+plot(covrat)
+abline(h=1 - 3*p/n)
+abline(h=1 + 3*p/n)
+View(covrat)
+
+# Cooks distance - No major influential points displacing the model parameters
+# The most influential points 71 (0.12), 73 (0.10), 87 (0.24) and 94 (0.17)
+cooksD = cooks.distance(full_model)
+plot(cooksD)
+cutoff = qf(0.5, p, n-p)
+abline(h=cutoff)
+View(cooksD)
+
+# Leverage points - About 4 points far enough away to be considered leverage points
+# Leverage points include 71 (0.31), 81 (0.26), 112 (0.26) and 113 (0.29)
+H_diag = lm.influence(full_model)$hat
+plot(H_diag)
+abline(h=2*p/n)
+View(H_diag)
+
+# Checking for normality - 73, 87 and 94 seems to violate the normality condition
+qqinfo = qqPlot(residuals$res_stud)
+View(qqinfo)
+
+
+# Multicollinearity diagnostics
+print(ols_coll_diag(full_model))
+# 4 VIF larger than 5 -> multicollinearity
+# 2 condition indexes larger than 100 - Moderate collinearity
+
+
+# Combining 4 last variables solves the collinearity issue - Transformations?
+n = nrow(bodyfat)
+p = ncol(bodyfat)
+
+new_data = bodyfat[,-(7:p)]
+print(new_data)
+new_data[,7] = bodyfat[,7] + bodyfat[,8]+ bodyfat[,9] + bodyfat[,10]
+
+summary(new_data)
+
+new_model = lm(DEXfat ~., data=new_data)
+
+print(ols_coll_diag(new_model))
+
+# Multicollinearity diagnostics
+new_model = lm(DEXfat ~., data=as.data.frame(truncated_data))
+print(ols_coll_diag(new_model))
+summary(new_model)
+
+
 #Box Cox
 data_boxcox <- transform_boxcox(bodyfat)
 boxcox_model <- create_model(data_boxcox)
@@ -181,69 +241,6 @@ residuals = get_res(full_model)
 SS_T = sum((bodyfat$DEXfat - mean(bodyfat$DEXfat))^2)
 R2_pred = 1 - press / SS_T
 print(R2_pred)
-
-# Examination of residuals - Seemingly ~3 outliers 73, 87, 94
-plot_res_vs_fitted(full_model)
-
-# Covratio with cutoff lines - A fair amount of seemingly influential points for precision
-# Influential points - bad for precision 73 (0.31), 87 (0.12), 92 (0.56) and 94 (0.40)
-covrat = covratio(full_model)
-plot(covrat)
-abline(h=1 - 3*p/n)
-abline(h=1 + 3*p/n)
-View(covrat)
-
-# Cooks distance - No major influential points displacing the model parameters
-# The most influential points 71 (0.12), 73 (0.10), 87 (0.24) and 94 (0.17)
-cooksD = cooks.distance(full_model)
-plot(cooksD)
-cutoff = qf(0.5, p, n-p)
-abline(h=cutoff)
-View(cooksD)
-
-# Leverage points - About 4 points far enough away to be considered leverage points
-# Leverage points include 71 (0.31), 81 (0.26), 112 (0.26) and 113 (0.29)
-H_diag = lm.influence(full_model)$hat
-plot(H_diag)
-abline(h=2*p/n)
-View(H_diag)
-
-# Checking for normality - 73, 87 and 94 seems to violate the normality condition
-qqinfo = qqPlot(residuals$res_stud)
-View(qqinfo)
-
-# Multicollinearity diagnostics
-print(ols_coll_diag(full_model))
-# 4 VIF larger than 5 -> multicollinearity
-# 2 condition indexes larger than 100 - Moderate collinearity
-
-
-# Combining 4 last variables solves the collinearity issue - Transformations?
-n = nrow(bodyfat)
-p = ncol(bodyfat)
-
-new_data = bodyfat[,-(7:p)]
-print(new_data)
-new_data[,7] = bodyfat[,7] + bodyfat[,8]+ bodyfat[,9] +bodyfat[,10]
-
-summary(new_data)
-
-new_model = lm(DEXfat ~., data=new_data)
-
-print(ols_coll_diag(new_model))
-
-# Attempting to apply PCA - Weird results
-pca = prcomp(bodyfat[, -2])
-plot(cumsum(pca$sdev^2/sum(pca$sdev^2)))
-
-n_pc = 3
-truncated_data = pca$x[,1:n_pc]
-print(t(pca$rotation[,1:n_pc]))
-# Multicollinearity diagnostics
-new_model = lm(DEXfat ~., data=as.data.frame(truncated_data))
-print(ols_coll_diag(new_model))
-summary(new_model)
-
 
 
 # Bootstrapping residuals
